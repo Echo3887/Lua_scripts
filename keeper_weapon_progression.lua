@@ -74,8 +74,8 @@ local CREATURE_EVENT_ON_DIED = 4
 local STAT_STRENGTH       = 3
 local STAT_AGILITY        = 4
 local STAT_STAMINA        = 5
-local STAT_INTELLECT      = 6
-local STAT_SPIRIT         = 7
+local STAT_INTELLECT      = 7
+local STAT_SPIRIT         = 8
 local STAT_CRIT           = 32
 local STAT_ATTACK_POWER   = 38
 local STAT_RANGED_AP      = 39
@@ -202,8 +202,6 @@ local PROGRESSION_WEAPONS = {
         weaponDamage = true,
 
         stats = {
-            STAT_CRIT,       -- 32
-            STAT_RANGED_AP,  -- 39
         },
 
         bosses = KEEPER_BOSSES,
@@ -223,8 +221,7 @@ local PROGRESSION_WEAPONS = {
 
         stats = {
             STAT_STAMINA,    -- 5
-            STAT_INTELLECT,  -- 6
-            STAT_CRIT,       -- 32
+            STAT_INTELLECT,  -- 7
         },
 
         bosses = KEEPER_BOSSES,
@@ -379,33 +376,14 @@ local function RegisterWeaponBossKill(player, item, bossEntry, killOrder)
 
     CharDBExecute(query)
 
-    -- Nach dem INSERT kontrollieren, ob der Datensatz wirklich
-    -- vorhanden ist.
-    local result = CharDBQuery(string.format(
-        "SELECT 1 " ..
-        "FROM keeper_weapon_progression " ..
-        "WHERE item_guid = %u " ..
-        "AND boss_entry = %u " ..
-        "AND kill_order = %u " ..
-        "LIMIT 1",
+    print(string.format(
+        "[Keeper][INFO] Bosskill gespeichert. " ..
+        "Player=%u ItemGUID=%u Boss=%u Rank=%u",
+        guid,
         itemGuid,
         bossEntry,
         killOrder
     ))
-
-    if not result then
-
-        print(string.format(
-            "[Keeper][ERROR] Bosskill konnte nicht gespeichert werden. " ..
-            "Player=%u ItemGUID=%u Boss=%u Rank=%u",
-            guid,
-            itemGuid,
-            bossEntry,
-            killOrder
-        ))
-
-        return false
-    end
 
     return true
 end
