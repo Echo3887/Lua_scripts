@@ -36,7 +36,6 @@ local RHOKDELAR_ENTRY = 18713
 local LOKDELAR_ENTRY  = 18715
 
 local MAX_PROGRESS = 48
-local CREATURE_EVENT_ON_DIED = 4
 
 
 -- ============================================================
