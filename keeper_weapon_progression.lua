@@ -346,426 +346,105 @@ local function HasWeaponKilledBoss(item, bossEntry)
     return result ~= nil
 end
 
-
--- ============================================================
--- Speichert den neuen Bosskill für das konkrete Item
--- ============================================================
---
--- Diese Funktion wird ERST aufgerufen, wenn alle Upgrades
--- erfolgreich verarbeitet wurden.
--- ============================================================
-
-local function RegisterWeaponBossKill(player, item, bossEntry, killOrder)
-
-    if not player or not item then
-        return false
-    end
-
-    local guid = player:GetGUIDLow()
-    local itemGuid = item:GetGUIDLow()
-
-    local query = string.format(
-        "INSERT IGNORE INTO keeper_weapon_progression " ..
-        "(guid, item_guid, boss_entry, kill_order) " ..
-        "VALUES (%u, %u, %u, %u)",
-        guid,
-        itemGuid,
-        bossEntry,
-        killOrder
-    )
-
-    CharDBExecute(query)
-
-    print(string.format(
-        "[Keeper][INFO] Bosskill gespeichert. " ..
-        "Player=%u ItemGUID=%u Boss=%u Rank=%u",
-        guid,
-        itemGuid,
-        bossEntry,
-        killOrder
-    ))
-
-    return true
-end
-
-
--- ============================================================
--- Upgrade: Waffenschaden
--- ============================================================
-
-local function UpgradeWeaponDamage(player, item, rank)
-
-    if not player or not item then
-        return false
-    end
-
-    local result = player:SetWeaponDamageUpgrade(
-        item,
-        rank
-    )
-
-    -- Success
-    if result == 0 then
-        return true
-    end
-
-    -- RankNotHigher bedeutet:
-    -- Der Waffenschaden ist bereits mindestens auf diesem Rang.
-    --
-    -- Das behandeln wir als erfolgreich, damit bei einem
-    -- vorherigen Teilfehler die fehlenden Stats später noch
-    -- nachgezogen werden können.
-    if result == 6 then
-        print(string.format(
-            "[Keeper][INFO] Weapon Damage bereits auf Rang >= %u. " ..
-            "Player=%u ItemGUID=%u",
-            rank,
-            player:GetGUIDLow(),
-            item:GetGUIDLow()
-        ))
-
-        return true
-    end
-
-    print(string.format(
-        "[Keeper][ERROR] Weapon Damage Upgrade fehlgeschlagen. " ..
-        "Player=%u ItemGUID=%u ItemEntry=%u Rank=%u Result=%u (%s)",
-        player:GetGUIDLow(),
-        item:GetGUIDLow(),
-        item:GetEntry(),
-        rank,
-        result,
-        GetWeaponUpgradeResultName(result)
-    ))
-
-    return false
-end
-
-
--- ============================================================
--- Upgrade: einzelne Item-Stat
--- ============================================================
-
-local function UpgradeWeaponStat(player, item, statType, rank)
-
-    if not player or not item then
-        return false
-    end
-
-    local result = player:SetItemStatUpgrade(
-        item,
-        statType,
-        rank
-    )
-
-    -- Success
-    if result == 0 then
-        return true
-    end
-
-    -- Der Stat befindet sich bereits auf dem gewünschten oder
-    -- einem höheren Rang.
-    --
-    -- Das gilt für die Progression als erfolgreich.
-    if result == 6 then
-        print(string.format(
-            "[Keeper][INFO] Stat bereits auf Rang >= %u. " ..
-            "Player=%u ItemGUID=%u Stat=%u (%s)",
-            rank,
-            player:GetGUIDLow(),
-            item:GetGUIDLow(),
-            statType,
-            GetStatName(statType)
-        ))
-
-        return true
-    end
-
-    print(string.format(
-        "[Keeper][ERROR] Stat Upgrade fehlgeschlagen. " ..
-        "Player=%u ItemGUID=%u ItemEntry=%u " ..
-        "Stat=%u (%s) Rank=%u Result=%u (%s)",
-        player:GetGUIDLow(),
-        item:GetGUIDLow(),
-        item:GetEntry(),
-        statType,
-        GetStatName(statType),
-        rank,
-        result,
-        GetStatUpgradeResultName(result)
-    ))
-
-    return false
-end
-
-
--- ============================================================
--- Führt ALLE Upgrades für den neuen Rang aus
--- ============================================================
---
--- Wichtig:
---
--- 1. Weapon Damage
--- 2. alle konfigurierten Stats
--- 3. erst danach wird der Bosskill gespeichert.
---
--- Dadurch wird ein Boss nicht als erledigt gespeichert,
--- solange mindestens ein benötigtes Upgrade fehlgeschlagen ist.
--- ============================================================
-
-local function ApplyWeaponProgression(player, item, config, rank)
-
-    if not player or not item or not config then
-        return false
-    end
-
-
-    -- ========================================================
-    -- Waffenschaden
-    -- ========================================================
-
-    if config.weaponDamage then
-
-        if not UpgradeWeaponDamage(
-            player,
-            item,
-            rank
-        ) then
-
-            print(string.format(
-                "[Keeper][ERROR] Progression abgebrochen: " ..
-                "Weapon Damage fehlgeschlagen. " ..
-                "Player=%u ItemGUID=%u Rank=%u",
-                player:GetGUIDLow(),
-                item:GetGUIDLow(),
-                rank
-            ))
-
-            return false
-        end
-    end
-
-
-    -- ========================================================
-    -- Stats
-    -- ========================================================
-
-    if config.stats then
-
-        for _, statType in ipairs(config.stats) do
-
-            if not UpgradeWeaponStat(
-                player,
-                item,
-                statType,
-                rank
-            ) then
-
-                print(string.format(
-                    "[Keeper][ERROR] Progression abgebrochen: " ..
-                    "Stat %u (%s) fehlgeschlagen. " ..
-                    "Player=%u ItemGUID=%u Rank=%u",
-                    statType,
-                    GetStatName(statType),
-                    player:GetGUIDLow(),
-                    item:GetGUIDLow(),
-                    rank
-                ))
-
-                return false
-            end
-        end
-    end
-
-
-    return true
-end
-
-
 -- ============================================================
 -- Verarbeitet den Bosskill für eine konkrete Waffe
 -- ============================================================
-
 local function ProcessWeaponBossKill(player, item, bossEntry)
 
     if not player or not item then
         return
     end
 
-
-    -- ========================================================
-    -- Playerbot-Schutz
-    -- ========================================================
-
+    -- Keine Playerbots
     if player:IsBot() then
         return
     end
 
-
-    -- ========================================================
     -- Sicherheitsprüfung:
-    -- Das Item muss tatsächlich ausgerüstet sein.
-    -- ========================================================
-
+    -- Nur tatsächlich ausgerüstete Items dürfen Progress erhalten.
     if not item:IsEquipped() then
-
-        print(string.format(
-            "[Keeper][DEBUG] Item nicht ausgerüstet. " ..
-            "Player=%u ItemGUID=%u Entry=%u Boss=%u",
-            player:GetGUIDLow(),
-            item:GetGUIDLow(),
-            item:GetEntry(),
-            bossEntry
-        ))
-
         return
     end
 
-
-    -- ========================================================
-    -- Konfiguration bestimmen
-    -- ========================================================
-
     local itemEntry = item:GetEntry()
-
     local config = PROGRESSION_WEAPONS[itemEntry]
 
     if not config then
         return
     end
 
-
-    -- ========================================================
-    -- Boss muss für diese Waffe konfiguriert sein
-    -- ========================================================
-
+    -- Boss muss für diese Waffe konfiguriert sein.
     if not config.bosses[bossEntry] then
         return
     end
 
-
-    -- ========================================================
-    -- Dieser Boss wurde mit genau diesem Item bereits gezählt
-    -- ========================================================
-
-    if HasWeaponKilledBoss(
-        item,
-        bossEntry
-    ) then
-
-        print(string.format(
-            "[Keeper][DEBUG] Boss bereits für Item gezählt. " ..
-            "Player=%u ItemGUID=%u Boss=%u",
-            player:GetGUIDLow(),
-            item:GetGUIDLow(),
-            bossEntry
-        ))
-
+    -- Bereits für dieses Item erledigt?
+    if HasWeaponKilledBoss(item, bossEntry) then
         return
     end
 
-
-    -- ========================================================
-    -- Aktuellen Rang ermitteln
-    -- ========================================================
-
+    -- Aktuellen Rang anhand der konkreten Item-GUID bestimmen.
     local currentProgress = GetWeaponProgress(item)
 
-
     if currentProgress >= config.maxRank then
-
-        print(string.format(
-            "[Keeper][INFO] Maximale Progression erreicht. " ..
-            "Player=%u ItemGUID=%u Progress=%u/%u",
-            player:GetGUIDLow(),
-            item:GetGUIDLow(),
-            currentProgress,
-            config.maxRank
-        ))
-
         return
     end
-
 
     local newProgress = currentProgress + 1
 
-
     -- ========================================================
-    -- Upgrades anwenden
+    -- NEUER ATOMARER C++-Aufruf
     --
-    -- Der Bosskill wird absichtlich NOCH NICHT gespeichert.
+    -- Weapon Damage + alle Stats + Bosskill werden
+    -- innerhalb EINER DB-Transaktion verarbeitet.
     -- ========================================================
 
-    local upgradeSuccess = ApplyWeaponProgression(
-        player,
+    local result = player:SetKeeperWeaponProgression(
         item,
-        config,
-        newProgress
+        bossEntry,
+        newProgress,
+        config.stats,
+        config.weaponDamage
     )
 
+    -- 0 = Success
+    if result ~= 0 then
 
-    if not upgradeSuccess then
+        print(string.format(
+            "[Keeper][ERROR] Progression fehlgeschlagen. " ..
+            "Player=%u ItemGUID=%u ItemEntry=%u Boss=%u " ..
+            "Rank=%u Result=%u",
+            player:GetGUIDLow(),
+            item:GetGUIDLow(),
+            itemEntry,
+            bossEntry,
+            newProgress,
+            result
+        ))
 
         player:SendBroadcastMessage(
             string.format(
                 "|cffFF0000Keeper-Waffe:|r " ..
                 "|cffFFFFFF%s|r konnte für diesen Boss nicht " ..
                 "auf Rang |cffFFFF00%u|r aktualisiert werden. " ..
-                "Siehe Worldserver-Konsole.",
+                "Result=%u. Siehe Worldserver-Konsole.",
                 item:GetName(),
-                newProgress
+                newProgress,
+                result
             )
         )
 
-        print(string.format(
-            "[Keeper][ERROR] Bosskill NICHT gespeichert. " ..
-            "Mindestens ein Upgrade fehlgeschlagen. " ..
-            "Player=%u ItemGUID=%u ItemEntry=%u Boss=%u " ..
-            "Rank=%u/%u",
-            player:GetGUIDLow(),
-            item:GetGUIDLow(),
-            itemEntry,
-            bossEntry,
-            newProgress,
-            config.maxRank
-        ))
-
         return
     end
 
-
     -- ========================================================
-    -- Jetzt erst Bosskill speichern
-    -- ========================================================
-
-    local registered = RegisterWeaponBossKill(
-        player,
-        item,
-        bossEntry,
-        newProgress
-    )
-
-
-    if not registered then
-
-        player:SendBroadcastMessage(
-            "|cffFF0000Keeper-Waffe:|r " ..
-            "|cffFFFFFFProgression konnte nicht gespeichert werden.|r " ..
-            "Siehe Worldserver-Konsole."
-        )
-
-        return
-    end
-
-
-    -- ========================================================
-    -- Erfolgsmeldung
+    -- Erfolg
     -- ========================================================
 
     player:SendBroadcastMessage(
         string.format(
             "|cffFFD100Keeper-Waffe:|r " ..
-            "|cffFFFFFF%s|r  " ..
+            "|cffFFFFFF%s|r " ..
             "|cffAAAAAAProgress:|r " ..
             "|cff00FF00%u/%u|r",
             item:GetName(),
@@ -773,7 +452,6 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
             config.maxRank
         )
     )
-
 
     print(string.format(
         "[Keeper][SUCCESS] Player=%u ItemGUID=%u ItemEntry=%u " ..
@@ -786,7 +464,6 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
         config.maxRank
     ))
 end
-
 
 -- ============================================================
 -- Ermittelt und verarbeitet alle ausgerüsteten
