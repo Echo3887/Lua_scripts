@@ -599,7 +599,7 @@ local function OnPlayerKillCreature(event, killer, killed)
 end
 
 RegisterPlayerEvent(
-    PLAYER_EVENT_ON_KILL_CREATURE,
+    7,
     OnPlayerKillCreature
 )
 
