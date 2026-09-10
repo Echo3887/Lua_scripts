@@ -546,6 +546,58 @@ local function ProcessGroupMembers(
     end
 end
 
+local function OnPlayerKillCreature(event, killer, killed)
+
+    if not killer or not killed then
+        return
+    end
+
+    local bossEntry = killed:GetEntry()
+
+    if not KEEPER_BOSSES[bossEntry] then
+        return
+    end
+
+    -- Gruppenfall:
+    -- Alle berechtigten menschlichen Spieler der Gruppe verarbeiten.
+    local group = killed:GetLootRecipientGroup()
+
+    if group then
+        ProcessGroupMembers(
+            killed,
+            group,
+            bossEntry
+        )
+        return
+    end
+
+    -- Kein Loot-Recipient-Group.
+    if not killer.IsPlayer or not killer:IsPlayer() then
+        return
+    end
+
+    -- Normaler menschlicher Spieler als Killer.
+    if not killer:IsBot() then
+        ProcessEquippedProgressionWeapons(
+            killer,
+            bossEntry
+        )
+        return
+    end
+
+    -- Playerbot als Killer:
+    -- nur menschliche Gruppenmitglieder verarbeiten.
+    local botGroup = killer:GetGroup()
+
+    if botGroup then
+        ProcessGroupMembers(
+            killed,
+            botGroup,
+            bossEntry
+        )
+    end
+end
+
 RegisterPlayerEvent(
     PLAYER_EVENT_ON_KILL_CREATURE,
     OnPlayerKillCreature
