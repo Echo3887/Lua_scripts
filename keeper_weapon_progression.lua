@@ -1,76 +1,6 @@
--- ============================================================
--- Keeper Weapon Progression
--- ============================================================
---
--- Item-basierte Progression:
---
--- Jede konkrete Item-GUID besitzt ihren eigenen Fortschritt.
---
--- Beispiel:
---   Item GUID 10001 -> Boss A, B, C -> Rang 3
---   Item GUID 10002 -> Boss A, D     -> Rang 2
---
--- Es gibt KEINE feste Boss-Reihenfolge.
--- Jeder konfigurierte Boss kann als nächster Progressionspunkt
--- verwendet werden.
---
--- Ein Boss wird pro konkreter Item-GUID nur einmal gezählt.
---
--- Nur tatsächlich ausgerüstete Progressionswaffen erhalten
--- beim Boss-Tod Fortschritt.
---
--- Playerbots werden vollständig ignoriert.
---
--- Die eigentlichen Item-Upgrades werden durch mod-item-upgrade
--- durchgeführt:
---
---   Player:SetWeaponDamageUpgrade(item, rank)
---   Player:SetItemStatUpgrade(item, statType, rank)
---
--- Der Rang von Waffenschaden und allen konfigurierten Stats
--- ist immer identisch.
--- ============================================================
-
-
 local RHOKDELAR_ENTRY = 18713
 local LOKDELAR_ENTRY  = 18715
-
 local MAX_PROGRESS = 48
-local CREATURE_EVENT_ON_DIED = 4
-
-
--- ============================================================
--- Stat-IDs
--- ============================================================
---
--- WoW 3.3.5 / ItemModType:
---
--- 3  = Strength
--- 4  = Agility
--- 5  = Stamina
--- 6  = Intellect
--- 7  = Spirit
--- 32 = Critical Strike Rating
--- 38 = Attack Power
--- 39 = Ranged Attack Power
---
--- WICHTIG:
--- mod-item-upgrade kann nur Stats verbessern, die tatsächlich
--- auf dem Item vorhanden sind.
---
--- Daher:
---
--- Rhok'delar:
---   Crit + Ranged AP
---
--- Lok'delar:
---   Stamina + Intellect + Crit
---
--- Falls deine eigene item_template andere Stats besitzt, kann
--- diese Liste hier angepasst werden.
--- ============================================================
-
-
 local STAT_STRENGTH       = 3
 local STAT_AGILITY        = 4
 local STAT_STAMINA        = 5
@@ -80,24 +10,7 @@ local STAT_CRIT           = 32
 local STAT_ATTACK_POWER   = 38
 local STAT_RANGED_AP      = 39
 
-
--- ============================================================
--- Gemeinsame Bossliste
--- ============================================================
---
--- Insgesamt 48 mögliche Bosse.
---
--- Es gibt keine Reihenfolge.
--- Jeder Boss kann unabhängig voneinander als nächster
--- Progressionspunkt zählen.
--- ============================================================
-
 local KEEPER_BOSSES = {
-
-    -- ========================================================
-    -- Molten Core
-    -- ========================================================
-
     [12118] = true, -- Lucifron
     [11982] = true, -- Magmadar
     [12259] = true, -- Gehennas
@@ -108,11 +21,6 @@ local KEEPER_BOSSES = {
     [11988] = true, -- Golemagg
     [12018] = true, -- Majordomo Executus
     [11502] = true, -- Ragnaros
-
-    -- ========================================================
-    -- Blackwing Lair
-    -- ========================================================
-
     [12435] = true, -- Razorgore
     [13020] = true, -- Vaelastrasz
     [12017] = true, -- Broodlord Lashlayer
@@ -121,11 +29,6 @@ local KEEPER_BOSSES = {
     [11981] = true, -- Flamegor
     [14020] = true, -- Chromaggus
     [11583] = true, -- Nefarian
-
-    -- ========================================================
-    -- Ahn'Qiraj
-    -- ========================================================
-
     [15263] = true, -- The Prophet Skeram
     [15511] = true, -- Lord Kri
     [15544] = true, -- Vem
@@ -138,11 +41,6 @@ local KEEPER_BOSSES = {
     [15276] = true, -- Emperor Vek'lor
     [15517] = true, -- Ouro
     [15727] = true, -- C'Thun
-
-    -- ========================================================
-    -- Naxxramas
-    -- ========================================================
-
     [15956] = true, -- Anub'Rekhan
     [15953] = true, -- Grand Widow Faerlina
     [15952] = true, -- Maexxna
@@ -163,78 +61,26 @@ local KEEPER_BOSSES = {
     [15990] = true, -- Kel'Thuzad
 }
 
-
--- ============================================================
--- Waffen-Konfiguration
--- ============================================================
---
--- Jede Waffe kann vollkommen unabhängig konfiguriert werden.
---
--- maxRank:
---     Maximale Progression.
---
--- weaponDamage:
---     true  = Waffenschaden wird mit dem Rang erhöht.
---     false = kein Waffenschaden-Upgrade.
---
--- stats:
---     ItemModType-IDs, die mit demselben Rang verbessert
---     werden sollen.
---
--- bosses:
---     Bosses, die für DIESE Waffenart zählen.
---
--- Die Bossliste kann später pro Waffe unabhängig geändert
--- werden.
--- ============================================================
-
 local PROGRESSION_WEAPONS = {
-
-    -- ========================================================
-    -- Rhok'delar, Longbow of the Ancient Keepers
-    -- Entry: 18713
-    -- ========================================================
-
     [RHOKDELAR_ENTRY] = {
-
         maxRank = MAX_PROGRESS,
-
         weaponDamage = true,
-
         stats = {
         },
-
         bosses = KEEPER_BOSSES,
     },
-
-
-    -- ========================================================
-    -- Lok'delar, Stave of the Ancient Keepers
-    -- Entry: 18715
-    -- ========================================================
-
     [LOKDELAR_ENTRY] = {
-
         maxRank = MAX_PROGRESS,
-
         weaponDamage = true,
-
         stats = {
             STAT_STAMINA,    -- 5
             STAT_INTELLECT,  -- 7
         },
-
         bosses = KEEPER_BOSSES,
     },
 }
 
-
--- ============================================================
--- Hilfsfunktion: Fehlertext für WeaponUpgradeResult
--- ============================================================
-
 local function GetWeaponUpgradeResultName(result)
-
     local names = {
         [0] = "Success",
         [1] = "InvalidPlayer",
@@ -245,17 +91,10 @@ local function GetWeaponUpgradeResultName(result)
         [6] = "RankNotHigher",
         [7] = "DatabaseError",
     }
-
     return names[result] or "Unknown"
 end
 
-
--- ============================================================
--- Hilfsfunktion: Fehlertext für StatUpgradeResult
--- ============================================================
-
 local function GetStatUpgradeResultName(result)
-
     local names = {
         [0] = "Success",
         [1] = "InvalidPlayer",
@@ -268,17 +107,10 @@ local function GetStatUpgradeResultName(result)
         [8] = "StatNotAllowed",
         [9] = "DatabaseError",
     }
-
     return names[result] or "Unknown"
 end
 
-
--- ============================================================
--- Hilfsfunktion: Name eines Stats
--- ============================================================
-
 local function GetStatName(statType)
-
     local names = {
         [STAT_STRENGTH]     = "Strength",
         [STAT_AGILITY]      = "Agility",
@@ -289,50 +121,31 @@ local function GetStatName(statType)
         [STAT_ATTACK_POWER] = "Attack Power",
         [STAT_RANGED_AP]    = "Ranged Attack Power",
     }
-
     return names[statType] or ("Stat " .. tostring(statType))
 end
 
-
--- ============================================================
--- Ermittelt den aktuellen Fortschritt eines konkreten Items
--- ============================================================
-
 local function GetWeaponProgress(item)
-
     if not item then
         return 0
     end
-
     local itemGuid = item:GetGUIDLow()
-
     local result = CharDBQuery(string.format(
         "SELECT COUNT(*) " ..
         "FROM keeper_weapon_progression " ..
         "WHERE item_guid = %u",
         itemGuid
     ))
-
     if not result then
         return 0
     end
-
     return result:GetUInt32(0)
 end
 
-
--- ============================================================
--- Prüft, ob genau dieses Item diesen Boss bereits gezählt hat
--- ============================================================
-
 local function HasWeaponKilledBoss(item, bossEntry)
-
     if not item then
         return false
     end
-
     local itemGuid = item:GetGUIDLow()
-
     local result = CharDBQuery(string.format(
         "SELECT 1 " ..
         "FROM keeper_weapon_progression " ..
@@ -342,63 +155,36 @@ local function HasWeaponKilledBoss(item, bossEntry)
         itemGuid,
         bossEntry
     ))
-
     return result ~= nil
 end
 
--- ============================================================
--- Verarbeitet den Bosskill für eine konkrete Waffe
--- ============================================================
 local function ProcessWeaponBossKill(player, item, bossEntry)
-
     if not player or not item then
         return
     end
-
-    -- Keine Playerbots
     if player:IsBot() then
         return
     end
-
-    -- Sicherheitsprüfung:
-    -- Nur tatsächlich ausgerüstete Items dürfen Progress erhalten.
     if not item:IsEquipped() then
         return
     end
-
     local itemEntry = item:GetEntry()
     local config = PROGRESSION_WEAPONS[itemEntry]
 
     if not config then
         return
     end
-
-    -- Boss muss für diese Waffe konfiguriert sein.
     if not config.bosses[bossEntry] then
         return
     end
-
-    -- Bereits für dieses Item erledigt?
     if HasWeaponKilledBoss(item, bossEntry) then
         return
     end
-
-    -- Aktuellen Rang anhand der konkreten Item-GUID bestimmen.
     local currentProgress = GetWeaponProgress(item)
-
     if currentProgress >= config.maxRank then
         return
     end
-
     local newProgress = currentProgress + 1
-
-    -- ========================================================
-    -- NEUER ATOMARER C++-Aufruf
-    --
-    -- Weapon Damage + alle Stats + Bosskill werden
-    -- innerhalb EINER DB-Transaktion verarbeitet.
-    -- ========================================================
-
     local result = player:SetKeeperWeaponProgression(
         item,
         bossEntry,
@@ -406,10 +192,7 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
         config.stats,
         config.weaponDamage
     )
-
-    -- 0 = Success
     if result ~= 0 then
-
         print(string.format(
             "[Keeper][ERROR] Progression fehlgeschlagen. " ..
             "Player=%u ItemGUID=%u ItemEntry=%u Boss=%u " ..
@@ -421,7 +204,6 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
             newProgress,
             result
         ))
-
         player:SendBroadcastMessage(
             string.format(
                 "|cffFF0000Keeper-Waffe:|r " ..
@@ -436,11 +218,6 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
 
         return
     end
-
-    -- ========================================================
-    -- Erfolg
-    -- ========================================================
-
     player:SendBroadcastMessage(
         string.format(
             "|cffFFD100Keeper-Waffe:|r " ..
@@ -452,7 +229,6 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
             config.maxRank
         )
     )
-
     print(string.format(
         "[Keeper][SUCCESS] Player=%u ItemGUID=%u ItemEntry=%u " ..
         "Boss=%u Progress=%u/%u",
@@ -465,81 +241,45 @@ local function ProcessWeaponBossKill(player, item, bossEntry)
     ))
 end
 
--- ============================================================
--- Ermittelt und verarbeitet alle ausgerüsteten
--- Progressionswaffen eines Spielers
--- ============================================================
---
--- Equipment Slots 0-18 werden geprüft.
---
--- Wichtig:
--- Nur ein tatsächlich ausgerüstetes Item mit einer bekannten
--- Progressionskonfiguration wird verarbeitet.
--- ============================================================
-
 local function ProcessEquippedProgressionWeapons(player, bossEntry)
-
     if not player then
         return
     end
-
-
-    -- Playerbot-Schutz
     if player:IsBot() then
         return
     end
-
-
     for slot = 0, 18 do
-
         local item = player:GetEquippedItemBySlot(slot)
-
         if item then
-
             local config = PROGRESSION_WEAPONS[
                 item:GetEntry()
             ]
-
             if config then
-
-                -- Zusätzliche Sicherheitsprüfung
                 if item:IsEquipped() then
-
                     ProcessWeaponBossKill(
                         player,
                         item,
                         bossEntry
                     )
-
                 end
             end
         end
     end
 end
 
-
--- ============================================================
--- Gruppenmitglieder verarbeiten
--- ============================================================
-
 local function ProcessGroupMembers(
     creature,
     group,
     bossEntry
 )
-
     if not group then
         return
     end
-
-
     local members = group:GetMembers()
 
     if not members then
         return
     end
-
-
     for _, member in ipairs(members) do
 
         if member
@@ -555,37 +295,15 @@ local function ProcessGroupMembers(
     end
 end
 
-
--- ============================================================
--- Boss Death
--- ============================================================
-
 local function OnBossDied(event, creature, killer)
-
     if not creature then
         return
     end
-
-
     local bossEntry = creature:GetEntry()
-
-
-    -- ========================================================
-    -- Nur bekannte Progressionsbosse verarbeiten
-    -- ========================================================
-
     if not KEEPER_BOSSES[bossEntry] then
         return
     end
-
-
-    -- ========================================================
-    -- Normaler Gruppenfall
-    -- ========================================================
-
     local group = creature:GetLootRecipientGroup()
-
-
     if group then
 
         ProcessGroupMembers(
@@ -596,44 +314,19 @@ local function OnBossDied(event, creature, killer)
 
         return
     end
-
-
-    -- ========================================================
-    -- Kein Loot-Recipient-Group
-    -- ========================================================
-
     if not killer then
         return
-    end
-
-
-    -- ========================================================
-    -- Direkter Spieler als Killer
-    -- ========================================================
-
+    end	
     if killer.IsPlayer and killer:IsPlayer() then
-
-        -- Normaler Spieler
         if not killer:IsBot() then
-
             ProcessEquippedProgressionWeapons(
                 killer,
                 bossEntry
             )
-
             return
-        end
-
-
-        -- ====================================================
-        -- Playerbot als Killer:
-        -- Nur menschliche Gruppenmitglieder verarbeiten.
-        -- ====================================================
-
+        end		
         local botGroup = killer:GetGroup()
-
         if botGroup then
-
             ProcessGroupMembers(
                 creature,
                 botGroup,
@@ -642,36 +335,6 @@ local function OnBossDied(event, creature, killer)
         end
     end
 end
-
-
--- ============================================================
--- Boss Hooks registrieren
--- ============================================================
---
--- Jeder Boss wird nur EINMAL registriert.
--- ============================================================
-
-local REGISTERED_BOSSES = {}
-
-
-for bossEntry, _ in pairs(KEEPER_BOSSES) do
-
-    if not REGISTERED_BOSSES[bossEntry] then
-
-        RegisterCreatureEvent(
-            bossEntry,
-            CREATURE_EVENT_ON_DIED,
-            OnBossDied
-        )
-
-        REGISTERED_BOSSES[bossEntry] = true
-    end
-end
-
-
--- ============================================================
--- Startmeldungen
--- ============================================================
 
 print("[Keeper] ==================================================")
 print("[Keeper] Item-basierte Weapon Progression geladen.")
