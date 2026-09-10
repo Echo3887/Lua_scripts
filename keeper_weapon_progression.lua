@@ -21,12 +21,6 @@
 --
 -- Playerbots werden vollständig ignoriert.
 --
--- Die eigentlichen Item-Upgrades werden durch mod-item-upgrade
--- durchgeführt:
---
---   Player:SetWeaponDamageUpgrade(item, rank)
---   Player:SetItemStatUpgrade(item, statType, rank)
---
 -- Der Rang von Waffenschaden und allen konfigurierten Stats
 -- ist immer identisch.
 -- ============================================================
@@ -70,14 +64,78 @@ local MAX_PROGRESS = 48
 -- ============================================================
 
 
-local STAT_STRENGTH       = 3
-local STAT_AGILITY        = 4
-local STAT_STAMINA        = 5
-local STAT_INTELLECT      = 7
-local STAT_SPIRIT         = 8
-local STAT_CRIT           = 32
-local STAT_ATTACK_POWER   = 38
-local STAT_RANGED_AP      = 39
+-- ============================================================
+-- ItemModType / item_template stat IDs
+-- ============================================================
+--
+-- AzerothCore WotLK 3.3.5a
+--
+-- Diese Werte entsprechen direkt der ItemModType-Enum aus
+-- ItemTemplate.h und damit auch mod-item-upgrade.stat_type.
+--
+-- 0 und 1 sind ebenfalls gültige ItemModType-Werte
+-- (Mana / Health), auch wenn sie für unsere Keeper-Waffen
+-- normalerweise nicht verwendet werden.
+--
+-- Nicht aufgeführte numerische Werte sind in 3.3.5a
+-- keine gültigen ItemModType-Einträge.
+-- ============================================================
+
+local STAT_MANA                       = 0
+local STAT_HEALTH                     = 1
+
+local STAT_AGILITY                    = 3
+local STAT_STRENGTH                   = 4
+local STAT_INTELLECT                  = 5
+local STAT_SPIRIT                     = 6
+local STAT_STAMINA                    = 7
+
+local STAT_DEFENSE_SKILL_RATING       = 12
+local STAT_DODGE_RATING               = 13
+local STAT_PARRY_RATING               = 14
+local STAT_BLOCK_RATING               = 15
+
+local STAT_HIT_MELEE_RATING           = 16
+local STAT_HIT_RANGED_RATING          = 17
+local STAT_HIT_SPELL_RATING           = 18
+
+local STAT_CRIT_MELEE_RATING          = 19
+local STAT_CRIT_RANGED_RATING         = 20
+local STAT_CRIT_SPELL_RATING          = 21
+
+local STAT_HIT_TAKEN_MELEE_RATING     = 22
+local STAT_HIT_TAKEN_RANGED_RATING    = 23
+local STAT_HIT_TAKEN_SPELL_RATING     = 24
+
+local STAT_CRIT_TAKEN_MELEE_RATING    = 25
+local STAT_CRIT_TAKEN_RANGED_RATING   = 26
+local STAT_CRIT_TAKEN_SPELL_RATING    = 27
+
+local STAT_HASTE_MELEE_RATING         = 28
+local STAT_HASTE_RANGED_RATING        = 29
+local STAT_HASTE_SPELL_RATING         = 30
+
+local STAT_HIT_RATING                 = 31
+local STAT_CRIT_RATING                = 32
+
+local STAT_HIT_TAKEN_RATING           = 33
+local STAT_CRIT_TAKEN_RATING          = 34
+
+local STAT_RESILIENCE_RATING          = 35
+local STAT_HASTE_RATING               = 36
+local STAT_EXPERTISE_RATING           = 37
+
+local STAT_ATTACK_POWER               = 38
+local STAT_RANGED_ATTACK_POWER        = 39
+
+local STAT_SPELL_HEALING_DONE         = 41
+local STAT_SPELL_DAMAGE_DONE          = 42
+local STAT_MANA_REGENERATION          = 43
+local STAT_ARMOR_PENETRATION_RATING   = 44
+local STAT_SPELL_POWER                = 45
+local STAT_HEALTH_REGEN               = 46
+local STAT_SPELL_PENETRATION          = 47
+local STAT_BLOCK_VALUE                = 48
 
 
 -- ============================================================
@@ -219,79 +277,13 @@ local PROGRESSION_WEAPONS = {
         weaponDamage = true,
 
         stats = {
-            STAT_STAMINA,    -- 5
-            STAT_INTELLECT,  -- 7
+            STAT_STAMINA,    -- 7
+            STAT_INTELLECT,  -- 5
         },
 
         bosses = KEEPER_BOSSES,
     },
 }
-
-
--- ============================================================
--- Hilfsfunktion: Fehlertext für WeaponUpgradeResult
--- ============================================================
-
-local function GetWeaponUpgradeResultName(result)
-
-    local names = {
-        [0] = "Success",
-        [1] = "InvalidPlayer",
-        [2] = "InvalidItem",
-        [3] = "InvalidWeapon",
-        [4] = "ItemNotOwned",
-        [5] = "InvalidRank",
-        [6] = "RankNotHigher",
-        [7] = "DatabaseError",
-    }
-
-    return names[result] or "Unknown"
-end
-
-
--- ============================================================
--- Hilfsfunktion: Fehlertext für StatUpgradeResult
--- ============================================================
-
-local function GetStatUpgradeResultName(result)
-
-    local names = {
-        [0] = "Success",
-        [1] = "InvalidPlayer",
-        [2] = "InvalidItem",
-        [3] = "ItemNotOwned",
-        [4] = "InvalidStat",
-        [5] = "InvalidRank",
-        [6] = "RankNotHigher",
-        [7] = "StatNotPresent",
-        [8] = "StatNotAllowed",
-        [9] = "DatabaseError",
-    }
-
-    return names[result] or "Unknown"
-end
-
-
--- ============================================================
--- Hilfsfunktion: Name eines Stats
--- ============================================================
-
-local function GetStatName(statType)
-
-    local names = {
-        [STAT_STRENGTH]     = "Strength",
-        [STAT_AGILITY]      = "Agility",
-        [STAT_STAMINA]      = "Stamina",
-        [STAT_INTELLECT]    = "Intellect",
-        [STAT_SPIRIT]       = "Spirit",
-        [STAT_CRIT]         = "Critical Strike Rating",
-        [STAT_ATTACK_POWER] = "Attack Power",
-        [STAT_RANGED_AP]    = "Ranged Attack Power",
-    }
-
-    return names[statType] or ("Stat " .. tostring(statType))
-end
-
 
 -- ============================================================
 -- Ermittelt den aktuellen Fortschritt eines konkreten Items
@@ -554,118 +546,10 @@ local function ProcessGroupMembers(
     end
 end
 
-
--- ============================================================
--- Boss Death
--- ============================================================
-
-local function OnBossDied(event, creature, killer)
-
-    if not creature then
-        return
-    end
-
-
-    local bossEntry = creature:GetEntry()
-
-
-    -- ========================================================
-    -- Nur bekannte Progressionsbosse verarbeiten
-    -- ========================================================
-
-    if not KEEPER_BOSSES[bossEntry] then
-        return
-    end
-
-
-    -- ========================================================
-    -- Normaler Gruppenfall
-    -- ========================================================
-
-    local group = creature:GetLootRecipientGroup()
-
-
-    if group then
-
-        ProcessGroupMembers(
-            creature,
-            group,
-            bossEntry
-        )
-
-        return
-    end
-
-
-    -- ========================================================
-    -- Kein Loot-Recipient-Group
-    -- ========================================================
-
-    if not killer then
-        return
-    end
-
-
-    -- ========================================================
-    -- Direkter Spieler als Killer
-    -- ========================================================
-
-    if killer.IsPlayer and killer:IsPlayer() then
-
-        -- Normaler Spieler
-        if not killer:IsBot() then
-
-            ProcessEquippedProgressionWeapons(
-                killer,
-                bossEntry
-            )
-
-            return
-        end
-
-
-        -- ====================================================
-        -- Playerbot als Killer:
-        -- Nur menschliche Gruppenmitglieder verarbeiten.
-        -- ====================================================
-
-        local botGroup = killer:GetGroup()
-
-        if botGroup then
-
-            ProcessGroupMembers(
-                creature,
-                botGroup,
-                bossEntry
-            )
-        end
-    end
-end
-
-
--- ============================================================
--- Boss Hooks registrieren
--- ============================================================
---
--- Jeder Boss wird nur EINMAL registriert.
--- ============================================================
-
--- local REGISTERED_BOSSES = {}
-
-
--- for bossEntry, _ in pairs(KEEPER_BOSSES) do
-
-    -- if not REGISTERED_BOSSES[bossEntry] then
-
-        -- RegisterCreatureEvent(
-            -- bossEntry,
-            -- CREATURE_EVENT_ON_DIED,
-            -- OnBossDied
-        -- )
-
-        -- REGISTERED_BOSSES[bossEntry] = true
-    -- end
--- end
+RegisterPlayerEvent(
+    PLAYER_EVENT_ON_KILL_CREATURE,
+    OnPlayerKillCreature
+)
 
 
 -- ============================================================
